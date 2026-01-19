@@ -1,22 +1,72 @@
+/************************************************************
+CtxDrummer: Context-aware, form-following MIDI rhythm engine
+------------------------------------------------------------
+
+WHAT THIS DOES (current behavior):
+- Sends MIDI notes to Ableton via loopMIDI (SuperCollider acts as a sequencer).
+- Uses a "lead sheet" (song roadmap) to update a shared context (~ctx).
+- Creates one independent generator Task per kit piece ("limb independence").
+- Each limb reads ~ctx (meter/density/energy) and produces a "non-human"
+  but musical pulse texture that adapts to meter changes.
+
+WHAT THIS DOES NOT DO YET (on purpose):
+- No explicit “AABA x4 then outro” repetition logic (easy to add).
+- No printing of section boundaries/bar numbers (easy to add).
+- No kit switching or limb remapping mid-performance (easy to add).
+- No advanced rhythm engines (Euclidean, clave, cross-rhythm), but the
+  architecture is set up perfectly to add them.
+
+EXTENSION STRATEGY:
+- Musical structure lives in ~leadSheet (score / roadmap)
+- Engine behavior lives in ~limbs and layer factories (~makeLimbTask)
+- Rendering/DAW integration stays in MIDIOut (~midiOut)
+************************************************************/
 
 
-
+/************************************************************
+1) MIDI OUTPUT SETUP (Ableton via loopMIDI)
+------------------------------------------------------------
+- MIDIClient.destinations prints available outputs.
+- You discovered that on Windows, index-based MIDIOut is most reliable.
+- If your loopMIDI index changes, update MIDIOut(2) accordingly.
+************************************************************/
 MIDIClient.init;
 
 MIDIClient.destinations.do { |ep, i|
     (i.asString ++ ": " ++ ep.device ++ " / " ++ ep.name).postln;
 };
 
-~midiOut = MIDIOut(2);  // <-- index of loopMIDI from Step 1
+~midiOut = MIDIOut(2);  // <- IMPORTANT: must match loopMIDI index
 ~midiOut.latency = 0;
 
-// sanity check
+// Optional sanity check:
+// NOTE: Doing noteOn/noteOff immediately may not trigger Ableton visibly.
+// If you want a reliable check, do it in a Routine/fork.
+// {
+//     ~midiOut.noteOn(0, 60, 100);
+//     0.2.wait;
+//     ~midiOut.noteOff(0, 60);
+// }.fork;
 
-//
-// ~midiOut.noteOn(0, 60, 100);
-//
-// ~midiOut.noteOff(0, 60);
 
+/************************************************************
+2) LEAD SHEET: musical context / roadmap (YOU EDIT THIS OFTEN)
+------------------------------------------------------------
+This is your “lead sheet” / score representation. It should contain:
+- title, tempo, swing, and a list of sections
+- per section: name, meter, bars, density, energy
+
+HOW TO EXTEND:
+- Add or reorder sections (intro, A, B, bridge, vamp, out, etc.)
+- Change meters per section to get mixed-meter forms
+- Change density/energy per section to shape rhythmic intensity
+- Add new fields later (e.g. "feel", "kitName", "layersOn", "cue")
+  without breaking the engine, as long as you decide how to use them.
+
+IMPORTANT:
+- Right now, the engine plays sections in order FOREVER (loops).
+- There is no “stop after N repeats” yet. You’ll add that later.
+************************************************************/
 (
 ~leadSheet = (
     title: "Untitled",
@@ -31,6 +81,9 @@ MIDIClient.destinations.do { |ep, i|
         (name: \out,   meter: [4,4], bars: 4, density: 0.18, energy: 0.18)
     ],
 
+    // KIT MAPPING:
+    // Map musical "kit keys" to MIDI note numbers in Ableton Drum Rack.
+    // Swap to a new kit by changing these numbers (or by switching ~leadSheet entirely).
     kit: (
         kick: 36,
         snare: 38,
@@ -43,6 +96,55 @@ MIDIClient.destinations.do { |ep, i|
 )
 
 (
+~peacefulKeyLeadSheet = (
+    title: "Peaceful Key",
+    tempo: 200,
+    swing: 0.0,  // or keep a feel param; engine currently doesn't use swing
+
+    sections: [
+        (name: \intro, meter: [3,4], bars: 16, density: 0.12, energy: 0.18),
+
+        // AABA form:
+        (name: \A,     meter: [3,4], bars: 8,  density: 0.18, energy: 0.22),
+        (name: \A2,    meter: [3,4], bars: 8,  density: 0.18, energy: 0.22),
+        (name: \B,     meter: [3,4], bars: 16, density: 0.24, energy: 0.28),
+        (name: \A3,    meter: [3,4], bars: 8,  density: 0.20, energy: 0.24),
+
+        (name: \outro, meter: [3,4], bars: 16, density: 0.10, energy: 0.16)
+    ],
+
+    kit: ~leadSheet.kit, // reuse same kit mapping
+	roadMapSpec: (
+    intro: \intro,
+    form: [\A, \A2, \B, \A3],
+    choruses: 4,
+    outro: \outro
+)
+);
+)
+
+
+
+/************************************************************
+3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN)
+------------------------------------------------------------
+This determines limb independence + role:
+- subdiv4   : base grid density (relative to 4/4 bar length)
+- phase     : rotation/offset so limbs don't line up in unison
+- densityMul: makes some limbs sparser/denser relative to ~ctx.density
+- vel       : velocity range for that limb (Ableton dynamics)
+
+HOW TO EXTEND:
+- Add new kit keys here to control new Drum Rack pads
+- Change subdiv4 to change rhythmic granularity
+- Change phase to de-align parts (limb independence)
+- Change densityMul to make certain limbs “speak” more/less
+- Change vel ranges to balance your kit in Ableton
+
+TIP:
+- For “less chaos,” lower densityMul or subdiv4 on hatC/perc1.
+************************************************************/
+(
 ~limbs = (
     kick:    (subdiv4: 4,  phase: 0, densityMul: 0.6, vel: [55, 105]),
     snare:   (subdiv4: 8,  phase: 3, densityMul: 0.8, vel: [35,  95]),
@@ -54,10 +156,32 @@ MIDIClient.destinations.do { |ep, i|
 )
 
 
+/************************************************************
+4) CONTEXT: the shared "what time is it?" state (ENGINE READS THIS)
+------------------------------------------------------------
+~ctx is the single shared current state:
+- section: which section name we are in
+- barInSection: bar index within current section
+- meter/density/energy: derived from current section definition
+
+All generator layers read ~ctx to adapt their output in real time.
+
+HOW TO EXTEND:
+- Add fields like:
+  ~ctx.chorus = 0;
+  ~ctx.globalBar = 0;
+  ~ctx.sectionIndex = 0;
+  ~ctx.formIteration = 0;
+- Add “cue” flags like:
+  ~ctx.isSectionStart = true/false;
+  ~ctx.isLastBarOfSection = true/false;
+so layers can do transitions/fills/changes near boundaries.
+************************************************************/
 (
 ~ctx = (section: \intro, barInSection: 0, meter: [4,4], density: 0.2, energy: 0.2);
 
 ~setCtxFromSection = { |sec|
+    // Called whenever score enters a new section
     ~ctx.section = sec.name;
     ~ctx.meter = sec.meter;
     ~ctx.density = sec.density;
@@ -66,14 +190,52 @@ MIDIClient.destinations.do { |ep, i|
 )
 
 
+/************************************************************
+5) METER MATH: convert time signature to bar length in quarter-beats
+------------------------------------------------------------
+We define beatsPerBar in terms of quarter-note beats, because TempoClock
+uses "beats" where 1 beat = quarter note by default.
+
+Examples:
+- 4/4 => 4 * (4/4) = 4 quarter-beats
+- 7/8 => 7 * (4/8) = 3.5 quarter-beats
+- 3/4 => 3 * (4/4) = 3 quarter-beats
+
+This makes meter changes easy, and keeps everything coherent.
+************************************************************/
 (
 ~barBeats = { |meter|
     var num = meter[0], den = meter[1];
-    num * (4/den)   // beats measured in quarter-notes
+    num * (4/den)
 };
 )
 
 
+/************************************************************
+6) SCORE FOLLOWER: advances through ~leadSheet.sections and updates ~ctx
+------------------------------------------------------------
+This is the heart of “form awareness.”
+
+CURRENT BEHAVIOR:
+- Loops through sections indefinitely.
+- For each section:
+  - sets ~ctx to that section’s values
+  - counts bars within the section using waits of beatsPerBar
+
+HOW TO EXTEND (PRINTING):
+- Uncomment the postln lines inside the bar loop to print where you are
+- Add a print at section entry (before sec.bars.do)
+- Add a global bar counter and chorus counter
+
+HOW TO EXTEND (FINITE FORM like “Intro + 4 choruses + Outro”):
+- You can add a "plan" field to leadSheet (see notes below),
+  OR add a separate “performance plan” list to iterate.
+- Right now it simply loops sections.size forever.
+
+IMPORTANT:
+- This Task is timing-critical. Keep heavy computation outside it,
+  or do precomputation before start.
+************************************************************/
 (
 ~scoreTask = Task({
     var sections = ~leadSheet.sections;
@@ -82,14 +244,19 @@ MIDIClient.destinations.do { |ep, i|
 
     loop {
         sec = sections[secIndex];
+
+        // OPTIONAL PRINT: announce section entry
+        ("== SECTION: " ++ sec.name ++ " | meter: " ++ sec.meter ++ " | bars: " ++ sec.bars).postln;
+
         ~setCtxFromSection.(sec);
 
         ~ctx.barInSection = 0;
         beatsPerBar = ~barBeats.(sec.meter);
 
         sec.bars.do {
-            // bar boundary "tick"
-            // ("sec:" + ~ctx.section + " bar:" + ~ctx.barInSection + " meter:" + sec.meter).postln;
+            // OPTIONAL PRINT: bar-by-bar
+            // ("sec: " ++ ~ctx.section ++ " bar: " ++ (~ctx.barInSection+1) ++ "/" ++ sec.bars
+            //     ++ " meter: " ++ sec.meter ++ " density: " ++ ~ctx.density).postln;
 
             beatsPerBar.wait;
             ~ctx.barInSection = ~ctx.barInSection + 1;
@@ -100,6 +267,35 @@ MIDIClient.destinations.do { |ep, i|
 }, ~clock);
 )
 
+
+/************************************************************
+7) LIMB TASK FACTORY: creates one independent generator per kitKey
+------------------------------------------------------------
+This is your “engine.”
+
+CURRENT ALGORITHM:
+- For the current section meter, compute beatsPerBar.
+- Decide stepsPerBar from limb role (subdiv4) scaled to bar length.
+- Compute a number of "hits" per bar from ~ctx.density * densityMul.
+- Emit evenly-spaced-ish hits within the bar, rotated by phase.
+- Each limb runs independently and continuously, reading ~ctx.
+
+WHY THIS IS POWERFUL:
+- You can swap the generator algorithm (Euclidean / clave / cross-rhythm)
+  without changing the lead sheet, score follower, or Ableton routing.
+
+HOW TO EXTEND:
+A) Replace the hit distribution:
+   - Euclidean/Bjorklund rhythms (very musical)
+   - probabilistic accent patterns
+   - cross-rhythm cycles (e.g. 5 over 4/4) that reset each section
+B) Add microtiming:
+   - per-limb jitter, or “ahead/behind” feel profiles
+C) Add density shaping:
+   - e.g. more hits late in the section, less early (phrasing)
+D) Add section cues:
+   - detect ~ctx.barInSection and do special behavior at boundaries
+************************************************************/
 (
 ~makeLimbTask = { |kitKey|
     Task({
@@ -107,6 +303,7 @@ MIDIClient.destinations.do { |ep, i|
         var role, baseSteps, phase, densityMul, velLo, velHi;
 
         loop {
+            // Pull the limb definition (or fallback defaults)
             role = ~limbs[kitKey] ? (subdiv4: 8, phase: 0, densityMul: 1.0, vel: [40, 100]);
 
             baseSteps  = role.subdiv4;
@@ -115,16 +312,17 @@ MIDIClient.destinations.do { |ep, i|
             velLo      = role.vel[0];
             velHi      = role.vel[1];
 
+            // Resolve current kit mapping dynamically (allows swapping kits later)
             note = ~leadSheet.kit[kitKey];
 
             meter = ~ctx.meter;
             beatsPerBar = ~barBeats.(meter);
 
-            // scale step count so it tracks bar length when meter changes
+            // Scale grid to bar length for meter changes
             stepsPerBar = (baseSteps * (beatsPerBar / 4)).round(1).asInteger.max(1);
             stepDur = beatsPerBar / stepsPerBar;
 
-            // role-aware density
+            // Role-aware density => hits per bar
             hits = ((~ctx.density * densityMul).linlin(0.10, 0.40, 1, stepsPerBar).round(1))
                 .clip(0, stepsPerBar);
 
@@ -132,7 +330,7 @@ MIDIClient.destinations.do { |ep, i|
             stepsPerBar.do {
                 var idx = (stepIndex + phase) % stepsPerBar;
 
-                // evenly-spaced-ish distribution (still “non-human”)
+                // Non-human "even-ish" distribution
                 var shouldHit = ((idx * hits) % stepsPerBar) < hits;
 
                 if (hits > 0 and: shouldHit) {
@@ -149,85 +347,260 @@ MIDIClient.destinations.do { |ep, i|
 )
 
 
-// one task per instrument option
-~pulseKick  = ~makeLimbTask.(\kick, 50, 110);
-~pulseSnare = ~makeLimbTask.(\snare, 30, 90);
+/************************************************************
+8) LAYERS: build one Task per kitKey dynamically
+------------------------------------------------------------
+This uses ~leadSheet.kit as the source of truth:
+- Every key in kit gets a layer Task
+- If you add a new kit key (e.g. clap: 39) and map it in Ableton,
+  it will automatically start generating unless you choose to skip it.
 
-
-// get all layers dynamically, i.e. whole kit
+HOW TO EXTEND:
+- Skip certain kit keys (e.g. only kick/snare/hat)
+- Use multiple layer factories for different behaviors by role
+- Use per-section “layersOn” to activate/deactivate layers
+************************************************************/
 (
 ~layers = IdentityDictionary.new;
 
 ~buildPulseLayersFromKit = {
     ~leadSheet.kit.keysValuesDo { |k, note|
-        // optionally skip some keys if you want
+        ~layers[k] = ~makeLimbTask.(k);
+    };
+};
+)
+
+
+/************************************************************
+9) BUILD/START/STOP: lifecycle management
+------------------------------------------------------------
+~build:
+- Creates a clock based on ~leadSheet.tempo
+- Rebuilds scoreTask on that clock
+- Rebuilds layers on that clock
+
+~start:
+- Calls build, then starts scoreTask + every layer
+
+~stop:
+- Stops every layer and the scoreTask
+
+HOW TO EXTEND:
+- Add a ~reset method that zeroes counters and restarts cleanly
+- Add “play for N sections then stop”
+- Add “AABA x4 then outro” performance plans
+************************************************************/
+(
+/************************************************************
+TUNE OVERRIDE HOOK
+------------------------------------------------------------
+- Call ~setTune.(<leadSheetEvent>) before ~start to override the default.
+- If you don't call ~setTune, ~defaultLeadSheet will be used.
+************************************************************/
+~defaultLeadSheet = ~leadSheet;   // whatever you defined earlier as the "default"
+~activeLeadSheet = nil;
+
+~setTune = { |ls|
+    ~activeLeadSheet = ls;
+    ("[CtxDrummer] Active leadSheet set to: " ++ ls.title).postln;
+};
+
+
+/************************************************************
+ROADMAP OVERRIDE HOOK
+------------------------------------------------------------
+- If you set ~roadMap manually (Array of section symbols), build will use it.
+- Otherwise, build will try to compile it from leadSheet.roadMapSpec.
+- If neither exists, the score loops sections forever (current behavior).
+
+Roadmap format example (finite):
+    ~roadMap = [\intro, \A, \A2, \B, \A3, \A, \A2, \B, \A3, \outro];
+
+Recommended: keep this inside the leadSheet as roadMapSpec, then compile.
+************************************************************/
+~roadMap = nil;
+
+~compileRoadMap = { |ls|
+    var spec = ls.roadMapSpec;
+    if (spec.isNil) { ^nil };
+
+    // Builds: [intro] + (form repeated choruses times) + [outro]
+    ^([spec.intro]
+        ++ (spec.form ! spec.choruses).flat
+        ++ [spec.outro]
+    ).flat;
+};
+
+
+/************************************************************
+BUILD: create clock, compile roadmap (optional), create score task, create layers
+------------------------------------------------------------
+IMPORTANT: This rebuilds Tasks every time you call ~start.
+That’s good: it avoids stale tasks and makes overrides reliable.
+************************************************************/
+~build = {
+    // 1) Choose tune
+    // Priority:
+    //   a) user override via ~setTune
+    //   b) default lead sheet
+    ~leadSheet = ~activeLeadSheet ? ~defaultLeadSheet;
+
+	~layers = IdentityDictionary.new;
+
+    // 2) Clock driven by leadSheet tempo
+    ~clock = TempoClock(~leadSheet.tempo/60);
+
+    // 3) Roadmap selection
+    // Priority:
+    //   a) manual override in ~roadMap (if you set it before start)
+    //   b) compile from leadSheet.roadMapSpec
+    //   c) nil => loop sections forever
+    if (~roadMap.isNil) {
+        ~roadMap = ~compileRoadMap.(~leadSheet);
+    };
+
+    ("[CtxDrummer] Using tune: " ++ ~leadSheet.title).postln;
+    if (~roadMap.notNil) {
+        ("[CtxDrummer] RoadMap (finite): " ++ ~roadMap).postln;
+    } {
+        "[CtxDrummer] RoadMap: none (looping sections forever)".postln;
+    };
+
+    // 4) Score task: either finite roadmap playback OR infinite sections loop
+    ~scoreTask = Task({
+        var sections = ~leadSheet.sections;
+        var sec, beatsPerBar;
+
+        // Optional form-tracking print helpers:
+        // If the leadSheet has roadMapSpec.form, we can count choruses.
+        var form = (~leadSheet.roadMapSpec ? ()).form ? nil;
+        var formLen = form.notNil.if({ form.size }, { 0 });
+        var formStep = 0;
+        var chorus = 0;
+
+        if (~roadMap.notNil) {
+            // FINITE: play roadmap once, then stop
+            ~roadMap.do { |secName|
+                sec = sections.detect { |s| s.name == secName };
+
+                if (sec.isNil) {
+                    ("[CtxDrummer] WARNING: section not found: " ++ secName).postln;
+                } {
+                    // PRINT: section entry
+                    ("== SECTION: " ++ sec.name
+                        ++ " | meter: " ++ sec.meter
+                        ++ " | bars: " ++ sec.bars
+                        ++ " | chorus: " ++ chorus
+                    ).postln;
+
+                    ~setCtxFromSection.(sec);
+
+                    ~ctx.barInSection = 0;
+                    beatsPerBar = ~barBeats.(sec.meter);
+
+                    sec.bars.do {
+                        // PRINT: bar position (comment out if too chatty)
+                        ("   bar " ++ (~ctx.barInSection + 1) ++ "/" ++ sec.bars
+                            ++ " | density " ++ ~ctx.density
+                            ++ " | energy " ++ ~ctx.energy
+                        ).postln;
+
+                        beatsPerBar.wait;
+                        ~ctx.barInSection = ~ctx.barInSection + 1;
+                    };
+
+                    // Chorus counting: advance when we complete a whole form cycle
+                    if (form.notNil and: { form.includes(sec.name) }) {
+                        formStep = formStep + 1;
+                        if (formStep >= formLen) {
+                            chorus = chorus + 1;
+                            formStep = 0;
+                            ("-- END CHORUS: " ++ chorus).postln;
+                        };
+                    };
+                };
+            };
+
+            "[CtxDrummer] RoadMap complete. Stopping.".postln;
+            // schedule stop on the clock so we stop cleanly
+            ~clock.sched(0, { ~stop.(); nil });
+
+        } {
+            // INFINITE: loop sections forever (your current behavior)
+            var secIndex = 0;
+
+            loop {
+                sec = sections[secIndex];
+
+                // PRINT: section entry
+                ("== SECTION: " ++ sec.name
+                    ++ " | meter: " ++ sec.meter
+                    ++ " | bars: " ++ sec.bars
+                ).postln;
+
+                ~setCtxFromSection.(sec);
+
+                ~ctx.barInSection = 0;
+                beatsPerBar = ~barBeats.(sec.meter);
+
+                sec.bars.do {
+                    beatsPerBar.wait;
+                    ~ctx.barInSection = ~ctx.barInSection + 1;
+                };
+
+                secIndex = (secIndex + 1) % sections.size;
+            };
+        };
+    }, ~clock);
+
+    // 5) Layers: one limb task per kit key (bound to this ~clock)
+    ~layers = IdentityDictionary.new;
+    ~leadSheet.kit.keysValuesDo { |k, note|
         ~layers[k] = ~makeLimbTask.(k);
     };
 };
 
-~startLayers = {
-    ~layers.valuesDo(_.start);
-};
 
-~stopLayers = {
-    ~layers.valuesDo(_.stop);
-};
-)
-
-
-
-
-(
-// --- BUILD: create clock and rebuild tasks on it ---
-~build = {
-    // clock
-    ~clock = TempoClock(~leadSheet.tempo/60);
-
-    // rebuild score task on this clock
-    ~scoreTask = Task({
-        var sections = ~leadSheet.sections;
-        var secIndex = 0;
-        var sec, beatsPerBar;
-
-        loop {
-            sec = sections[secIndex];
-            ~setCtxFromSection.(sec);
-
-            ~ctx.barInSection = 0;
-            beatsPerBar = ~barBeats.(sec.meter);
-
-            sec.bars.do {
-                beatsPerBar.wait;
-                ~ctx.barInSection = ~ctx.barInSection + 1;
-            };
-
-            secIndex = (secIndex + 1) % sections.size;
-        }
-    }, ~clock);
-
-    // rebuild layers dictionary from kit (each task bound to ~clock)
-    ~layers = IdentityDictionary.new;
-    ~leadSheet.kit.keysValuesDo { |k, note|
-        ~layers[k] = ~makeLimbTask.(k); // makePulseTask uses ~clock
-    };
-};
-
-// --- START ---
+// START
 ~start = {
     ~build.();
     ~scoreTask.start;
-    ~layers.keysValuesDo { |k, t| t.start };
+
+    if (~layers.notNil) {
+        ~layers.keysValuesDo { |k, t| t.start };
+    }{
+        "[CtxDrummer] WARNING: ~layers is nil".postln;
+    };
+
     "CtxDrummer: started".postln;
 };
 
-// --- STOP ---
+// STOP
 ~stop = {
     if (~layers.notNil) { ~layers.keysValuesDo { |k, t| t.stop } };
     if (~scoreTask.notNil) { ~scoreTask.stop };
+
+    // optional safety: prevent stuck notes in Ableton racks
+    // ~midiOut.allNotesOff(0);
+
     "CtxDrummer: stopped".postln;
+
+    // IMPORTANT: clear roadmap if you want the next start to recompile from leadSheet
+    // Comment this out if you want ~roadMap to persist across starts.
+    ~roadMap = nil;
 };
-)
+
+
+
+
+// Run:
+~setTune.(~peacefulKeyLeadSheet);  // choose tune here!
+
+~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 4).flat ++ [\outro];  // specify an arrangement here!
 
 ~start.();
+
+
+// Stop:
 ~stop.();
 
