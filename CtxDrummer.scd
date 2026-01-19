@@ -147,7 +147,7 @@ TIP:
 (
 ~limbs = (
     kick:    (subdiv4: 4,  phase: 0, densityMul: 0.6, vel: [55, 105]),
-    snare:   (subdiv4: 8,  phase: 3, densityMul: 0.8, vel: [35,  95]),
+    snare:   (subdiv4: 8,  phase: 3, densityMul: 0.2, vel: [35,  95]),
     hatFoot: (subdiv4: 4,  phase: 1, densityMul: 0.4, vel: [25,  70]),
     hatC:    (subdiv4: 16, phase: 0, densityMul: 1.0, vel: [20,  60]),
     ride:    (subdiv4: 12, phase: 0, densityMul: 0.7, vel: [35,  80]),
@@ -232,40 +232,6 @@ HOW TO EXTEND (FINITE FORM like “Intro + 4 choruses + Outro”):
   OR add a separate “performance plan” list to iterate.
 - Right now it simply loops sections.size forever.
 
-IMPORTANT:
-- This Task is timing-critical. Keep heavy computation outside it,
-  or do precomputation before start.
-************************************************************/
-(
-~scoreTask = Task({
-    var sections = ~leadSheet.sections;
-    var secIndex = 0;
-    var sec, beatsPerBar;
-
-    loop {
-        sec = sections[secIndex];
-
-        // OPTIONAL PRINT: announce section entry
-        ("== SECTION: " ++ sec.name ++ " | meter: " ++ sec.meter ++ " | bars: " ++ sec.bars).postln;
-
-        ~setCtxFromSection.(sec);
-
-        ~ctx.barInSection = 0;
-        beatsPerBar = ~barBeats.(sec.meter);
-
-        sec.bars.do {
-            // OPTIONAL PRINT: bar-by-bar
-            // ("sec: " ++ ~ctx.section ++ " bar: " ++ (~ctx.barInSection+1) ++ "/" ++ sec.bars
-            //     ++ " meter: " ++ sec.meter ++ " density: " ++ ~ctx.density).postln;
-
-            beatsPerBar.wait;
-            ~ctx.barInSection = ~ctx.barInSection + 1;
-        };
-
-        secIndex = (secIndex + 1) % sections.size;
-    }
-}, ~clock);
-)
 
 
 /************************************************************
@@ -439,6 +405,9 @@ IMPORTANT: This rebuilds Tasks every time you call ~start.
 That’s good: it avoids stale tasks and makes overrides reliable.
 ************************************************************/
 ~build = {
+	// --- hard stop anything currently running (prevents duplicate tasks) ---
+	if (~scoreTask.notNil) { ~scoreTask.stop };
+	if (~layers.notNil) { ~layers.keysValuesDo { |k, t| t.stop } };
     // 1) Choose tune
     // Priority:
     //   a) user override via ~setTune
@@ -476,7 +445,7 @@ That’s good: it avoids stale tasks and makes overrides reliable.
         var form = (~leadSheet.roadMapSpec ? ()).form ? nil;
         var formLen = form.notNil.if({ form.size }, { 0 });
         var formStep = 0;
-        var chorus = 0;
+        var chorus = 1;
 
         if (~roadMap.notNil) {
             // FINITE: play roadmap once, then stop
@@ -498,16 +467,16 @@ That’s good: it avoids stale tasks and makes overrides reliable.
                     ~ctx.barInSection = 0;
                     beatsPerBar = ~barBeats.(sec.meter);
 
-                    sec.bars.do {
-                        // PRINT: bar position (comment out if too chatty)
-                        ("   bar " ++ (~ctx.barInSection + 1) ++ "/" ++ sec.bars
-                            ++ " | density " ++ ~ctx.density
-                            ++ " | energy " ++ ~ctx.energy
-                        ).postln;
+                    sec.bars.do { |i|
+						("   bar " ++ (i+1) ++ "/" ++ sec.bars
+							++ " | density " ++ ~ctx.density
+							++ " | energy " ++ ~ctx.energy
+						).postln;
 
-                        beatsPerBar.wait;
-                        ~ctx.barInSection = ~ctx.barInSection + 1;
-                    };
+						beatsPerBar.wait;
+						~ctx.barInSection = i+1;  // keep ctx in sync
+					};
+
 
                     // Chorus counting: advance when we complete a whole form cycle
                     if (form.notNil and: { form.includes(sec.name) }) {
@@ -594,7 +563,7 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 
 // Run:
-~setTune.(~peacefulKeyLeadSheet);  // choose tune here!
+~setTune.(~peacefulKeyLeadSheet); // choose tune here!
 
 ~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 4).flat ++ [\outro];  // specify an arrangement here!
 
