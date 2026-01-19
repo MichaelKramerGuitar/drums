@@ -63,9 +63,12 @@ HOW TO EXTEND:
 - Add new fields later (e.g. "feel", "kitName", "layersOn", "cue")
   without breaking the engine, as long as you decide how to use them.
 
-IMPORTANT:
-- Right now, the engine plays sections in order FOREVER (loops).
-- There is no “stop after N repeats” yet. You’ll add that later.
+IMPORTANT (current state):
+- If ~roadMap is nil AND leadSheet.roadMapSpec is nil:
+    -> the score loops leadSheet.sections forever.
+- If ~roadMap is set OR leadSheet.roadMapSpec is present:
+    -> the score will run a FINITE arrangement and then auto-stop.
+- You can override which tune is active using ~setTune.(<leadSheet>).
 ************************************************************/
 (
 ~leadSheet = (
@@ -146,10 +149,10 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (subdiv4: 4,  phase: 0, densityMul: 0.6, vel: [55, 105]),
+    kick:    (subdiv4: 4,  phase: 0, densityMul: 0.4, vel: [55, 105]),
     snare:   (subdiv4: 8,  phase: 3, densityMul: 0.2, vel: [35,  95]),
     hatFoot: (subdiv4: 4,  phase: 1, densityMul: 0.4, vel: [25,  70]),
-    hatC:    (subdiv4: 16, phase: 0, densityMul: 1.0, vel: [20,  60]),
+    hatC:    (subdiv4: 16, phase: 0, densityMul: 0.5, vel: [20,  60]),
     ride:    (subdiv4: 12, phase: 0, densityMul: 0.7, vel: [35,  80]),
     perc1:   (subdiv4: 10, phase: 2, densityMul: 1.1, vel: [30, 100])
 );
@@ -212,26 +215,32 @@ This makes meter changes easy, and keeps everything coherent.
 
 
 /************************************************************
-6) SCORE FOLLOWER: advances through ~leadSheet.sections and updates ~ctx
+6) SCORE FOLLOWER (now built inside ~build)
 ------------------------------------------------------------
-This is the heart of “form awareness.”
+NOTE: The scoreTask is NOT defined as a top-level Task anymore.
+It is rebuilt inside ~build every time you call ~start.
+
+WHY:
+- Prevents stale Tasks bound to old clocks.
+- Makes tune/roadMap overrides reliable.
+- Avoids multiple scoreTasks accidentally running at once.
 
 CURRENT BEHAVIOR:
-- Loops through sections indefinitely.
-- For each section:
-  - sets ~ctx to that section’s values
-  - counts bars within the section using waits of beatsPerBar
+- If ~roadMap exists (or leadSheet.roadMapSpec compiles one):
+    -> play roadmap once, print progress, then auto-stop.
+- Else:
+    -> loop leadSheet.sections forever.
 
-HOW TO EXTEND (PRINTING):
-- Uncomment the postln lines inside the bar loop to print where you are
-- Add a print at section entry (before sec.bars.do)
-- Add a global bar counter and chorus counter
+PRINTING:
+- Section entry prints at the top of each section.
+- Bar-by-bar prints inside the section loop.
+  (If too chatty, comment out the bar-level postln.)
 
-HOW TO EXTEND (FINITE FORM like “Intro + 4 choruses + Outro”):
-- You can add a "plan" field to leadSheet (see notes below),
-  OR add a separate “performance plan” list to iterate.
-- Right now it simply loops sections.size forever.
-
+EXTENSION POINTS (future):
+- Add global counters to ~ctx (globalBar, chorus, sectionIndex).
+- Add cue flags: isSectionStart / isLastBar.
+- Add per-section directives like layersOn/layersOff.
+************************************************************/
 
 
 /************************************************************
@@ -351,10 +360,16 @@ HOW TO EXTEND:
 ~stop:
 - Stops every layer and the scoreTask
 
-HOW TO EXTEND:
-- Add a ~reset method that zeroes counters and restarts cleanly
-- Add “play for N sections then stop”
-- Add “AABA x4 then outro” performance plans
+HOW TO EXTEND (next steps):
+- Add a ~reset method that zeroes counters and restarts cleanly.
+- Move roadMap generation into leadSheet.roadMapSpec for each tune so you
+  rarely need to manually set ~roadMap.
+- Add richer roadMap specs (e.g. tags, DS al Coda, vamp until cue).
+- Add per-section print verbosity options (quiet/section-only/bar-by-bar).
+- Add per-section layer enable/disable (e.g. hatC only in B, no perc1 in intro).
+- Add "stop-after" controls:
+    - already supported implicitly via finite roadMap (auto-stop at end)
+    - could also add: stopAfterBars, stopAfterChoruses, etc.
 ************************************************************/
 (
 /************************************************************
@@ -373,12 +388,16 @@ TUNE OVERRIDE HOOK
 
 
 /************************************************************
-ROADMAP OVERRIDE HOOK
-------------------------------------------------------------
-- If you set ~roadMap manually (Array of section symbols), build will use it.
-- Otherwise, build will try to compile it from leadSheet.roadMapSpec.
-- If neither exists, the score loops sections forever (current behavior).
+ROADMAP PRECEDENCE (current behavior):
+1) If ~roadMap is set (manual override), build uses it as-is.
+2) Else if leadSheet.roadMapSpec exists, build compiles a finite roadMap.
+3) Else, score loops leadSheet.sections forever.
 
+PERSISTENCE NOTE:
+- In ~stop, ~roadMap is cleared so the next ~start will recompile from
+  leadSheet.roadMapSpec (unless you manually set ~roadMap again).
+- If you want ~roadMap to persist across starts, comment out "~roadMap = nil;"
+  in ~stop.
 Roadmap format example (finite):
     ~roadMap = [\intro, \A, \A2, \B, \A3, \A, \A2, \B, \A3, \outro];
 
