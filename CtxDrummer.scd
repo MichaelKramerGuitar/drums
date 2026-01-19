@@ -49,6 +49,46 @@ MIDIClient.destinations.do { |ep, i|
 // }.fork;
 
 
+(
+// Simple click sound (audio only, no MIDI, never recorded as MIDI in Ableton)
+SynthDef(\ctxClick, { |out=0, amp=0.15, freq=1200|
+	var env = EnvGen.kr(Env.perc(0.001, 0.04), doneAction:2);
+	var sig = SinOsc.ar(freq) * env * amp;
+	Out.ar(out, sig!2);
+}).add;
+)
+
+(
+// Click config
+~clickEnabled = true;      // toggle
+~clickOut = 0;             // SC audio out bus (0 = main)
+~clickAmp = 0.12;
+
+// bar/beat click: strong on 1, light otherwise
+~makeClickTask = {
+	Task({
+		loop {
+			var meter = ~ctx.meter ? [4,4];
+			var beatsPerBar = ~barBeats.(meter);     // in quarter-beats
+			var beats = meter[0];                    // "counted" beats
+			var beatDur = beatsPerBar / beats;       // duration of one beat in clock beats
+
+			beats.do { |i|
+				if (~clickEnabled) {
+					Synth(\ctxClick, [
+						\out, ~clickOut,
+						\amp, (i == 0).if({ ~clickAmp * 1.8 }, { ~clickAmp }),
+						\freq, (i == 0).if({ 1600 }, { 1100 })
+					]);
+				};
+				beatDur.wait;
+			};
+		}
+	}, ~clock);
+};
+)
+
+
 /************************************************************
 2) LEAD SHEET: musical context / roadmap (YOU EDIT THIS OFTEN)
 ------------------------------------------------------------
@@ -101,7 +141,7 @@ IMPORTANT (current state):
 (
 ~peacefulKeyLeadSheet = (
     title: "Peaceful Key",
-    tempo: 200,
+    tempo: 186,
     swing: 0.0,  // or keep a feel param; engine currently doesn't use swing
 
     sections: [
@@ -129,7 +169,9 @@ IMPORTANT (current state):
 
 
 /************************************************************
-3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN)
+3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN AND DURING RECORDING!)
+
+THIS IS WHERE YOU CAN 'SHAPE' THE LIVE PERFORMANCE - and actually play the drums
 ------------------------------------------------------------
 This determines limb independence + role:
 - subdiv4   : base grid density (relative to 4/4 bar length)
@@ -149,11 +191,11 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (subdiv4: 4,  phase: 0, densityMul: 0.4, vel: [55, 105]),
-    snare:   (subdiv4: 8,  phase: 3, densityMul: 0.2, vel: [35,  95]),
+    kick:    (subdiv4: 13,  phase: 3, densityMul: 0.001, vel: [55, 105]),
+    snare:   (subdiv4: 18,  phase: 1, densityMul: 0.2, vel: [20,  95]),
     hatFoot: (subdiv4: 4,  phase: 1, densityMul: 0.4, vel: [25,  70]),
-    hatC:    (subdiv4: 16, phase: 0, densityMul: 0.5, vel: [20,  60]),
-    ride:    (subdiv4: 12, phase: 0, densityMul: 0.7, vel: [35,  80]),
+    hatC:    (subdiv4: 8, phase: 3, densityMul: 0.5, vel: [20,  60]),
+    ride:    (subdiv4: 8, phase: 0, densityMul: 0.7, vel: [35,  80]),
     perc1:   (subdiv4: 10, phase: 2, densityMul: 1.1, vel: [30, 100])
 );
 )
@@ -546,12 +588,15 @@ That’s good: it avoids stale tasks and makes overrides reliable.
     ~leadSheet.kit.keysValuesDo { |k, note|
         ~layers[k] = ~makeLimbTask.(k);
     };
+
+	~clickTask = ~makeClickTask.();
 };
 
 
 // START
 ~start = {
     ~build.();
+	if (~clickTask.notNil) { ~clickTask.start };
     ~scoreTask.start;
 
     if (~layers.notNil) {
@@ -567,6 +612,7 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 ~stop = {
     if (~layers.notNil) { ~layers.keysValuesDo { |k, t| t.stop } };
     if (~scoreTask.notNil) { ~scoreTask.stop };
+	if (~clickTask.notNil) { ~clickTask.stop };
 
     // optional safety: prevent stuck notes in Ableton racks
     // ~midiOut.allNotesOff(0);
@@ -591,4 +637,7 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 // Stop:
 ~stop.();
+
+CmdPeriod.run;     // panic: stops routines, frees synths, clears queues
+s.freeAll;
 
