@@ -1,3 +1,13 @@
+/*This is a POC that came out of a vibe coding session.
+It's a "drummer" I guess, that can play on a 12 bar form
+with a "swing" feel.
+
+It's significance is that I realized that I can use
+Supercollider as a sequencer (essentially) by opening a
+Midi port with loopMIDI and then passing that through to Ableton
+
+That's a huge deal!*/
+
 
 MIDIClient.dispose;
 MIDIClient.init;
@@ -43,7 +53,7 @@ MIDIClient.destinations.do { |ep, i|
 ~conductor.density = 0.20;   // Miles-ish default (low)
 
 // 0..1: how "up" the band is (affects accents)
-~conductor.energy = 0.05;
+~conductor.energy = 0.25;
 
 
 // simple per-bar shaping (12-bar chorus)
@@ -126,7 +136,7 @@ SynthDef(\ride, {
 )
 
 
-// Here's the kit defs
+// Here's the kit defs - you need to check in the midi kit in the DAW which note corresponds to which instrument but these seem pretty standard
 
 // ride
 (
