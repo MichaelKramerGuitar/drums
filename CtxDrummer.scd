@@ -169,7 +169,9 @@ IMPORTANT (current state):
 
 
 /************************************************************
-3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN)
+3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN AND DURING RECORDING!)
+
+THIS IS WHERE YOU CAN 'SHAPE' THE LIVE PERFORMANCE - and actually play the drums
 ------------------------------------------------------------
 This determines limb independence + role:
 - subdiv4   : base grid density (relative to 4/4 bar length)
@@ -189,8 +191,8 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (subdiv4: 12,  phase: 1, densityMul: 0.001, vel: [55, 105]),
-    snare:   (subdiv4: 4,  phase: 2, densityMul: 0.2, vel: [20,  95]),
+    kick:    (subdiv4: 13,  phase: 3, densityMul: 0.001, vel: [55, 105]),
+    snare:   (subdiv4: 18,  phase: 1, densityMul: 0.2, vel: [20,  95]),
     hatFoot: (subdiv4: 4,  phase: 1, densityMul: 0.4, vel: [25,  70]),
     hatC:    (subdiv4: 8, phase: 3, densityMul: 0.5, vel: [20,  60]),
     ride:    (subdiv4: 8, phase: 0, densityMul: 0.7, vel: [35,  80]),
