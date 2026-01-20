@@ -30,6 +30,9 @@ EXTENSION STRATEGY:
 - You discovered that on Windows, index-based MIDIOut is most reliable.
 - If your loopMIDI index changes, update MIDIOut(2) accordingly.
 ************************************************************/
+
+s.boot;
+
 MIDIClient.init;
 
 MIDIClient.destinations.do { |ep, i|
@@ -149,14 +152,19 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (subdiv4: 5,  phase: 1.5, densityMul: 0.001, vel: [55, 105]),
-    snare:   (subdiv4: 8,  phase: 1, densityMul: 0.2, vel: [20,  95]),
-    hatFoot: (subdiv4: 4,  phase: 1, densityMul: 0.4, vel: [25,  70]),
-    hatC:    (subdiv4: 8, phase: 5, densityMul: 0.5, vel: [20,  60]),
-    ride:    (subdiv4: 7, phase: 8, densityMul: 1, vel: [35,  80]),
-    perc1:   (subdiv4: 10, phase: 2, densityMul: 1.1, vel: [30, 100])
+    kick:    (on: true,  subdiv4: 5,  phase: 1.5, densityMul: 0.001, vel: [55,105]),
+    snare:   (on: true,  subdiv4: 8,  phase: 1,   densityMul: 0.2,   vel: [20, 95]),
+    hatFoot: (on: true,  subdiv4: 4,  phase: 3,   densityMul: 0.4,   vel: [25, 70]),
+    hatC:    (on: true,  subdiv4: 8,  phase: 5,   densityMul: 0.5,   vel: [20, 60]),
+    ride:    (on: true,  subdiv4: 7,  phase: 8,   densityMul: 1.0,   vel: [35, 80]),
+    perc1:   (on: true,  subdiv4: 10, phase: 2,   densityMul: 1.1,   vel: [30,100])
 );
 )
+
+/* Drop out idea, doesn't work till you rebuild though so you can't "do it live" */
+
+/*~limbs[\kick].put(\on, false);  // drop kick (next bar)
+~limbs[\kick].put(\on, true);   // bring it back (next bar)*/
 
 
 /************************************************************
@@ -280,6 +288,13 @@ D) Add section cues:
         loop {
             // Pull the limb definition (or fallback defaults)
             role = ~limbs[kitKey] ? (subdiv4: 8, phase: 0, densityMul: 1.0, vel: [40, 100]);
+			// after role is loaded:
+			if (role[\on] == false) {
+				// still advance time so this task stays in sync, but emit no notes
+				// easiest: wait one bar and loop
+				(~barBeats.(~ctx.meter)).wait;
+				continue;
+			};
 
             baseSteps  = role.subdiv4;
             phase      = role.phase;
