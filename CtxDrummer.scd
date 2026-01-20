@@ -110,62 +110,20 @@ IMPORTANT (current state):
     -> the score will run a FINITE arrangement and then auto-stop.
 - You can override which tune is active using ~setTune.(<leadSheet>).
 ************************************************************/
-(
-~leadSheet = (
-    title: "Untitled",
-    tempo: 132,
-    swing: 0.58,
 
-    sections: [
-        (name: \intro, meter: [4,4], bars: 4, density: 0.15, energy: 0.20),
-        (name: \A,     meter: [7,8], bars: 8, density: 0.22, energy: 0.28),
-        (name: \B,     meter: [4,4], bars: 8, density: 0.30, energy: 0.35),
-        (name: \A2,    meter: [7,8], bars: 8, density: 0.26, energy: 0.32),
-        (name: \out,   meter: [4,4], bars: 4, density: 0.18, energy: 0.18)
-    ],
+/************************************************************
+Base Lead Sheet
+************************************************************/
 
-    // KIT MAPPING:
-    // Map musical "kit keys" to MIDI note numbers in Ableton Drum Rack.
-    // Swap to a new kit by changing these numbers (or by switching ~leadSheet entirely).
-    kit: (
-        kick: 36,
-        snare: 38,
-        hatC: 42,
-        hatFoot: 44,
-        ride: 51,
-        perc1: 70
-    )
-);
-)
+~leadSheet = "./leadsheets/baseLeadSheet.scd".loadRelative[0];
 
-(
-~peacefulKeyLeadSheet = (
-    title: "Peaceful Key",
-    tempo: 186,
-    swing: 0.0,  // or keep a feel param; engine currently doesn't use swing
+/************************************************************
+ Available Tunes
+************************************************************/
 
-    sections: [
-        (name: \intro, meter: [3,4], bars: 16, density: 0.12, energy: 0.18),
+~peacefulKeyLeadSheet = "./leadsheets/peacefulKeyLeadSheet.scd".loadRelative[0];
 
-        // AABA form:
-        (name: \A,     meter: [3,4], bars: 8,  density: 0.18, energy: 0.22),
-        (name: \A2,    meter: [3,4], bars: 8,  density: 0.18, energy: 0.22),
-        (name: \B,     meter: [3,4], bars: 16, density: 0.24, energy: 0.28),
-        (name: \A3,    meter: [3,4], bars: 8,  density: 0.20, energy: 0.24),
-
-        (name: \outro, meter: [3,4], bars: 16, density: 0.10, energy: 0.16)
-    ],
-
-    kit: ~leadSheet.kit, // reuse same kit mapping
-	roadMapSpec: (
-    intro: \intro,
-    form: [\A, \A2, \B, \A3],
-    choruses: 4,
-    outro: \outro
-)
-);
-)
-
+~mindAndHeartLeadSheet = "./leadsheets/mindAndHeartLeadSheet.scd".loadRelative[0];
 
 
 /************************************************************
@@ -191,11 +149,11 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (subdiv4: 13,  phase: 3, densityMul: 0.001, vel: [55, 105]),
-    snare:   (subdiv4: 18,  phase: 1, densityMul: 0.2, vel: [20,  95]),
+    kick:    (subdiv4: 5,  phase: 1.5, densityMul: 0.001, vel: [55, 105]),
+    snare:   (subdiv4: 8,  phase: 1, densityMul: 0.2, vel: [20,  95]),
     hatFoot: (subdiv4: 4,  phase: 1, densityMul: 0.4, vel: [25,  70]),
-    hatC:    (subdiv4: 8, phase: 3, densityMul: 0.5, vel: [20,  60]),
-    ride:    (subdiv4: 8, phase: 0, densityMul: 0.7, vel: [35,  80]),
+    hatC:    (subdiv4: 8, phase: 5, densityMul: 0.5, vel: [20,  60]),
+    ride:    (subdiv4: 7, phase: 8, densityMul: 1, vel: [35,  80]),
     perc1:   (subdiv4: 10, phase: 2, densityMul: 1.1, vel: [30, 100])
 );
 )
@@ -628,9 +586,15 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 
 // Run:
-~setTune.(~peacefulKeyLeadSheet); // choose tune here!
 
-~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 4).flat ++ [\outro];  // specify an arrangement here!
+/**************** Peaceful Key Config *******************/
+// ~setTune.(~peacefulKeyLeadSheet); // choose tune here!
+// ~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 4).flat ++ [\outro]; ' // specify an arrangement here!
+
+/*************** Mind and Heart Config ******************/
+
+~setTune.(~mindAndHeartLeadSheet); // choose tune here!
+~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 3).flat;  // specify an arrangement here!
 
 ~start.();
 
