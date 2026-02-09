@@ -13,7 +13,7 @@ leadsheets/gangsterFlickLeadSheet.scd
     swing: 0.2,  // or keep a feel param; engine currently doesn't use swing
 
     sections: [
-        (name: \interlude, meter: [5,4], bars: 8, density: 0.95, energy: 0.85),
+        (name: \intro, meter: [5,4], bars: 10, density: 0.95, energy: 0.85),
 
         // AABA form:
         (name: \A,     meter: [5,4], bars: 12,  density: 0.18, energy: 0.50),
@@ -29,7 +29,7 @@ leadsheets/gangsterFlickLeadSheet.scd
 
     kit: ~leadSheet.kit, // reuse same kit mapping
 	roadMapSpec: (
-    intro: \interlude,
+    intro: \intro,
     form: [\A, \A2, \interlude, \A, \A2, \interlude, \B, \interlude],
     choruses: 2
 )

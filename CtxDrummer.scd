@@ -132,6 +132,8 @@ Base Lead Sheet
 
 ~gangsterFlickLeadSheet = "./leadsheets/gangsterFlickLeadSheet.scd".loadRelative[0];
 
+~didntTakeTheBaitLeadSheet = "./leadsheets/didntTakeTheBaitLeadSheet.scd".loadRelative[0];
+
 
 /************************************************************
 3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN AND DURING RECORDING!)
@@ -623,8 +625,14 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 /*************** Gangster Flick Config ******************/
 
-~setTune.(~gangsterFlickLeadSheet); // choose tune here!
-~roadMap = [\interlude] ++ ([\A, \A2, \interlude, \A, \A2, \interlude, \B, \interlude] ! 2).flat;  // specify an arrangement here!
+// ~setTune.(~gangsterFlickLeadSheet); // choose tune here!
+// ~roadMap = [\intro] ++ ([\A, \A2, \interlude, \A, \A2, \interlude, \B, \interlude] ! 2).flat;  // specify an arrangement here!
+/********************************************************/
+
+/*************** Didn't Take The Bait Config ******************/
+
+~setTune.(~didntTakeTheBaitLeadSheet); // choose tune here!
+~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 3).flat;  // specify an arrangement here!
 /********************************************************/
 
 ~start.();
