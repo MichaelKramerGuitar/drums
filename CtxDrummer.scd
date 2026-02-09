@@ -63,7 +63,7 @@ SynthDef(\ctxClick, { |out=0, amp=0.15, freq=1200|
 
 (
 // Click config
-~clickEnabled = true;      // toggle
+~clickEnabled = false;      // toggle
 ~clickOut = 0;             // SC audio out bus (0 = main)
 ~clickAmp = 0.12;
 
@@ -129,6 +129,8 @@ Base Lead Sheet
 ~mindAndHeartLeadSheet = "./leadsheets/mindAndHeartLeadSheet.scd".loadRelative[0];
 
 ~identityPoliticsLeadSheet = "./leadsheets/identityPoliticsLeadSheet.scd".loadRelative[0];
+
+~gangsterFlickLeadSheet = "./leadsheets/gangsterFlickLeadSheet.scd".loadRelative[0];
 
 
 /************************************************************
@@ -615,8 +617,14 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 /*************** Identity Politics Config ******************/
 
-~setTune.(~identityPoliticsLeadSheet); // choose tune here!
-~roadMap = [\intro] ++ ([\A, \B, \C] ! 2).flat ++ [\outro];  // specify an arrangement here!
+// ~setTune.(~identityPoliticsLeadSheet); // choose tune here!
+// ~roadMap = [\intro] ++ ([\A, \B, \C] ! 2).flat ++ [\outro];  // specify an arrangement here!
+/********************************************************/
+
+/*************** Gangster Flick Config ******************/
+
+~setTune.(~gangsterFlickLeadSheet); // choose tune here!
+~roadMap = [\interlude] ++ ([\A, \A2, \interlude, \A, \A2, \interlude, \B, \interlude] ! 2).flat;  // specify an arrangement here!
 /********************************************************/
 
 ~start.();
