@@ -134,6 +134,8 @@ Base Lead Sheet
 
 ~didntTakeTheBaitLeadSheet = "./leadsheets/didntTakeTheBaitLeadSheet.scd".loadRelative[0];
 
+~scandalThreadLeadSheet = "./leadsheets/scandalThreadLeadSheet.scd".loadRelative[0];
+
 
 /************************************************************
 3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN AND DURING RECORDING!)
@@ -158,12 +160,12 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (on: true,  subdiv4: 1,  phase: 1, densityMul: 0.001, vel: [55,105]),
-    snare:   (on: true,  subdiv4: 3,  phase: 1,   densityMul: 0.2,   vel: [20, 95]),
-    hatFoot: (on: true,  subdiv4: 4,  phase: 5.5,   densityMul: 2,   vel: [25, 70]),
-    hatC:    (on: true,  subdiv4: 8,  phase: 5,   densityMul: 2,   vel: [20, 60]),
-    ride:    (on: true,  subdiv4: 8,  phase: 8,   densityMul: 1.0,   vel: [35, 80]),
-    perc1:   (on: true,  subdiv4: 10, phase: 2,   densityMul: 1.1,   vel: [30,100])
+    kick:    (on: true,  subdiv4: 2,  phase: 1, densityMul: 0.001, vel: [55,105]),
+    snare:   (on: true,  subdiv4: 3,  phase: 0.5,   densityMul: 0.2,   vel: [20, 95]),
+    hatFoot: (on: true,  subdiv4: 4,  phase: 5.5,   densityMul: 0.2,   vel: [25, 70]),
+    hatC:    (on: true,  subdiv4: 8,  phase: 5,   densityMul: 0.3,   vel: [20, 60]),
+    ride:    (on: true,  subdiv4: 8,  phase: 8,   densityMul: 0.4,   vel: [35, 80]),
+    perc1:   (on: true,  subdiv4: 10, phase: 2,   densityMul: 0.5,   vel: [30,100])
 );
 )
 
@@ -391,7 +393,6 @@ HOW TO EXTEND (next steps):
     - already supported implicitly via finite roadMap (auto-stop at end)
     - could also add: stopAfterBars, stopAfterChoruses, etc.
 ************************************************************/
-(
 /************************************************************
 TUNE OVERRIDE HOOK
 ------------------------------------------------------------
@@ -631,9 +632,16 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 /*************** Didn't Take The Bait Config ******************/
 
-~setTune.(~didntTakeTheBaitLeadSheet); // choose tune here!
-~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 3).flat;  // specify an arrangement here!
+// ~setTune.(~didntTakeTheBaitLeadSheet); // choose tune here!
+// ~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 3).flat;  // specify an arrangement here!
 /********************************************************/
+
+/*************** Didn't Take The Bait Config ******************/
+
+~setTune.(~scandalThreadLeadSheet); // choose tune here!
+~roadMap = [\intro] ++ ([\A, \interlude] ! 5).flat ++ [\B] ++ [\outro];  // specify an arrangement here!
+/********************************************************/
+
 
 ~start.();
 

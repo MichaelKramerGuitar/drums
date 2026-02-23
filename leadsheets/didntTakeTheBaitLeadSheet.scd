@@ -9,7 +9,7 @@ leadsheets/didntTakeTheBaitLeadSheet.scd
 (
 ~didntTakeTheBaitLeadSheet = (
     title: "Didn't Take The Bait",
-    tempo: 152,
+    tempo: 132,
     swing: 0.3,  // or keep a feel param; engine currently doesn't use swing
 
     sections: [
