@@ -136,6 +136,8 @@ Base Lead Sheet
 
 ~scandalThreadLeadSheet = "./leadsheets/scandalThreadLeadSheet.scd".loadRelative[0];
 
+~notPresentlyLeadSheet = "./leadsheets/notPresentlyLeadSheet.scd".loadRelative[0];
+
 
 /************************************************************
 3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN AND DURING RECORDING!)
@@ -160,10 +162,10 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (on: true,  subdiv4: 2,  phase: 1, densityMul: 0.001, vel: [55,105]),
-    snare:   (on: true,  subdiv4: 3,  phase: 0.5,   densityMul: 0.2,   vel: [20, 95]),
+    kick:    (on: true,  subdiv4: 0.5,  phase: 0.5, densityMul: 0.001, vel: [55,105]),
+    snare:   (on: true,  subdiv4: 3.5,  phase: 4,   densityMul: 0.2,   vel: [20, 95]),
     hatFoot: (on: true,  subdiv4: 4,  phase: 5.5,   densityMul: 0.2,   vel: [25, 70]),
-    hatC:    (on: true,  subdiv4: 8,  phase: 5,   densityMul: 0.3,   vel: [20, 60]),
+    hatC:    (on: true,  subdiv4: 7,  phase: 5,   densityMul: 0.9,   vel: [20, 60]),
     ride:    (on: true,  subdiv4: 8,  phase: 8,   densityMul: 0.4,   vel: [35, 80]),
     perc1:   (on: true,  subdiv4: 10, phase: 2,   densityMul: 0.5,   vel: [30,100])
 );
@@ -636,12 +638,17 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 // ~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 3).flat;  // specify an arrangement here!
 /********************************************************/
 
-/*************** Didn't Take The Bait Config ******************/
+/*************** Scandal Thread Config ******************/
 
 ~setTune.(~scandalThreadLeadSheet); // choose tune here!
 ~roadMap = [\intro] ++ ([\A, \interlude] ! 5).flat ++ [\B] ++ [\outro];  // specify an arrangement here!
 /********************************************************/
 
+/*************** Not Presently Config ******************/
+
+~setTune.(~notPresentlyLeadSheet); // choose tune here!
+~roadMap = [\intro, \B, \B, \A, \C, \A, \B_prime];  // specify an arrangement here!
+/********************************************************/
 
 ~start.();
 
