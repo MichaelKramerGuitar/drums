@@ -13,7 +13,7 @@ leadsheets/mindAndHeartLeadSheet.scd
     swing: 0.3,  // or keep a feel param; engine currently doesn't use swing
 
     sections: [
-        (name: \intro, meter: [4,4], bars: 8, density: 0.25, energy: 0.45),
+        (name: \intro, meter: [4,4], bars: 10, density: 0.25, energy: 0.45),
 
         // AABA form:
         (name: \A,     meter: [4,4], bars: 8,  density: 0.18, energy: 0.22),

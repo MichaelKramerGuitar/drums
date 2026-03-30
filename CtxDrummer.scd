@@ -138,6 +138,7 @@ Base Lead Sheet
 
 ~notPresentlyLeadSheet = "./leadsheets/notPresentlyLeadSheet.scd".loadRelative[0];
 
+~downLeadSheet = "./leadsheets/downLeadSheet.scd".loadRelative[0];
 
 /************************************************************
 3) LIMBS: engine behavior per kit key (YOU TWEAK THIS OFTEN AND DURING RECORDING!)
@@ -162,11 +163,11 @@ TIP:
 ************************************************************/
 (
 ~limbs = (
-    kick:    (on: true,  subdiv4: 0.5,  phase: 0.5, densityMul: 0.001, vel: [55,105]),
-    snare:   (on: true,  subdiv4: 3.5,  phase: 4,   densityMul: 0.2,   vel: [20, 95]),
-    hatFoot: (on: true,  subdiv4: 4,  phase: 5.5,   densityMul: 0.2,   vel: [25, 70]),
-    hatC:    (on: true,  subdiv4: 7,  phase: 5,   densityMul: 0.9,   vel: [20, 60]),
-    ride:    (on: true,  subdiv4: 8,  phase: 8,   densityMul: 0.4,   vel: [35, 80]),
+    kick:    (on: true,  subdiv4: 1,  phase: 3.5, densityMul: 8, vel: [55,105]),
+    snare:   (on: true,  subdiv4: 4,  phase: 3,   densityMul: 0.0001,   vel: [20, 95]),
+    hatFoot: (on: true,  subdiv4: 6,  phase: 5.5,   densityMul: 0.2,   vel: [25, 70]),
+    hatC:    (on: true,  subdiv4: 12,  phase: 5,   densityMul: 0.9,   vel: [20, 60]),
+    ride:    (on: true,  subdiv4: 3,  phase: 1.5,   densityMul: 0.4,   vel: [35, 80]),
     perc1:   (on: true,  subdiv4: 10, phase: 2,   densityMul: 0.5,   vel: [30,100])
 );
 )
@@ -616,8 +617,8 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 /*************** Mind and Heart Config ******************/
 
-// ~setTune.(~mindAndHeartLeadSheet); // choose tune here!
-// ~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 3).flat;  // specify an arrangement here!
+~setTune.(~mindAndHeartLeadSheet); // choose tune here!
+~roadMap = [\intro] ++ ([\A, \A2, \B, \A3] ! 3).flat;  // specify an arrangement here!
 /********************************************************/
 
 /*************** Identity Politics Config ******************/
@@ -648,6 +649,12 @@ That’s good: it avoids stale tasks and makes overrides reliable.
 
 ~setTune.(~notPresentlyLeadSheet); // choose tune here!
 ~roadMap = [\intro, \B, \B, \A, \C, \A, \B_prime];  // specify an arrangement here!
+/********************************************************/
+
+/*************** Down Config ******************/
+
+~setTune.(~downLeadSheet); // choose tune here!
+~roadMap = [\intro] ++ ([\A, \A, \B, \interlude] ! 2).flat;  // specify an arrangement here!
 /********************************************************/
 
 ~start.();
